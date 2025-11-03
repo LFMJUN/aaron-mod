@@ -1,10 +1,18 @@
-# Automatically build the project and run any configured tests for every push
-# and submitted pull request. This can help catch issues that only occur on
-# certain platforms or Java versions, and provides a first line of defence
-# against bad commits.
-
 name: build
-on: [pull_request, push]
+
+on:
+  push:
+  pull_request:
+  # 手动触发入口（Actions 页的 “Run workflow” 按钮）
+  workflow_dispatch:
+    inputs:
+      gradle-task:
+        description: 'build'
+        required: false
+        default: 'build'
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -12,19 +20,32 @@ jobs:
     steps:
       - name: checkout repository
         uses: actions/checkout@v4
+
       - name: validate gradle wrapper
         uses: gradle/actions/wrapper-validation@v4
+
       - name: setup jdk
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'microsoft'
+
       - name: make gradle wrapper executable
         run: chmod +x ./gradlew
+
+      # 可选 clean
+      - name: clean
+        if: ${{ inputs.clean == 'true' }}
+        run: ./gradlew clean
+
       - name: build
-        run: ./gradlew build
+        run: ./gradlew ${{ inputs.gradle-task || 'build' }}
+
       - name: capture build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Artifacts
-          path: build/libs/
+          name: Artifacts-${{ github.ref_name }}-${{ github.run_number }}
+          path: |
+            build/libs/**
+          if-no-files-found: error
+          retention-days: 14
